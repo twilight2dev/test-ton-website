@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base href="/test-ton-website/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="web_test">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png" />
+
+  <title>web_test</title>
+  <link rel="manifest" href="manifest.json">
+
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    const serviceWorkerVersion = "2128209588";
+  </script>
+  <!-- This script adds the flutter initialization JS code -->
+  <script src="flutter.js" defer></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script src="ton_webpack/dist/bundle.js"></script>
+</head>
+
+<body>
+  <script type="text/javascript">
+    window.flutterWebRenderer = "html";
+  </script>
+  <script>
+    window.addEventListener('load', function (ev) {
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        },
+        onEntrypointLoaded: function (engineInitializer) {
+          engineInitializer.initializeEngine().then(function (appRunner) {
+            appRunner.runApp();
+          });
+        }
+      });
+    });
+  </script>
+  <script>
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: "https://raw.githubusercontent.com/XaBbl4/pytonconnect/main/pytonconnect-manifest.json",
+    });
+    const ton = window.ton;
+    const jettonWalletCode = "b5ee9c7201021101000323000114ff00f4a413f4bcf2c80b0102016202030202cc0405001ba0f605da89a1f401f481f481a8610201d40607020120080900c30831c02497c138007434c0c05c6c2544d7c0fc03383e903e900c7e800c5c75c87e800c7e800c1cea6d0000b4c7e08403e29fa954882ea54c4d167c0278208405e3514654882ea58c511100fc02b80d60841657c1ef2ea4d67c02f817c12103fcbc2000113e910c1c2ebcb853600201200a0b0083d40106b90f6a2687d007d207d206a1802698fc1080bc6a28ca9105d41083deecbef09dd0958f97162e99f98fd001809d02811e428027d012c678b00e78b6664f6aa401f1503d33ffa00fa4021f001ed44d0fa00fa40fa40d4305136a1522ac705f2e2c128c2fff2e2c254344270542013541403c85004fa0258cf1601cf16ccc922c8cb0112f400f400cb00c920f9007074c8cb02ca07cbffc9d004fa40f40431fa0020d749c200f2e2c4778018c8cb055008cf1670fa0217cb6b13cc80c0201200d0e009e8210178d4519c8cb1f19cb3f5007fa0222cf165006cf1625fa025003cf16c95005cc2391729171e25008a813a08209c9c380a014bcf2e2c504c98040fb001023c85004fa0258cf1601cf16ccc9ed5402f73b51343e803e903e90350c0234cffe80145468017e903e9014d6f1c1551cdb5c150804d50500f214013e809633c58073c5b33248b232c044bd003d0032c0327e401c1d3232c0b281f2fff274140371c1472c7cb8b0c2be80146a2860822625a019ad822860822625a028062849e5c412440e0dd7c138c34975c2c0600f1000d73b51343e803e903e90350c01f4cffe803e900c145468549271c17cb8b049f0bffcb8b08160824c4b402805af3cb8b0e0841ef765f7b232c7c572cfd400fe8088b3c58073c5b25c60063232c14933c59c3e80b2dab33260103ec01004f214013e809633c58073c5b3327b552000705279a018a182107362d09cc8cb1f5230cb3f58fa025007cf165007cf16c9718010c8cb0524cf165006fa0215cb6a14ccc971fb0010241023007cc30023c200b08e218210d53276db708010c8cb055008cf165004fa0216cb6a12cb1f12cb3fc972fb0093356c21e203c85004fa0258cf1601cf16ccc9ed54";
+    const jettonWalletAddress = "kQCkNcHvhvywxay3I8sF1L4zQR-YPBsl3i92LMiQ-Da0Npjl";
+
+    async function connectTonWallet() {
+      try {
+        const wallet = await tonConnectUI.connectWallet();
+        await resetInset();
+        return JSON.stringify(wallet);
+      } catch (error) {
+        await resetInset();
+        throw error;
+      }
+    }
+
+    async function disconnectTonWallet() {
+      try {
+        await tonConnectUI.disconnect();
+        resetInset();
+      } catch (error) {
+        throw error;
+      }
+    }
+
+    async function deposit(senderAddress, destinationAddress, amountInTon, comment, useTon) {
+      var transaction = {}
+      const validUntil = Math.floor(Date.now() / 1000) + 60;
+      const forwardPayload = ton.beginCell()
+        .storeUint(0, 32) // 0 opcode means we have a comment
+        .storeStringTail(comment)
+        .endCell();
+
+      if (useTon) {
+        transaction = {
+          validUntil: validUntil,
+          messages: [
+            {
+              address: destinationAddress,
+              amount: ton.toNano(amountInTon).toString(),
+              payload: forwardPayload.toBoc().toString("base64") // payload with comment in body
+            }
+          ]
+        }
+      } else {
+        const body = ton.beginCell()
+          .storeUint(0xf8a7ea5, 32)                             // jetton transfer op code
+          .storeUint(0, 64)                                     // query_id:uint64
+          .storeCoins(ton.toNano(amountInTon))                  // amount:(VarUInteger 16) -  Jetton amount for transfer (decimals = 6 - jUSDT, 9 - default)
+          .storeAddress(ton.Address.parse(destinationAddress))  // destination:MsgAddress
+          .storeAddress(ton.Address.parse(senderAddress))       // response_destination:MsgAddress
+          .storeBit(0)                                          // custom_payload:(Maybe ^Cell)
+          .storeCoins(ton.toNano(0.01))                         // forward_ton_amount:(VarUInteger 16) - if >0, will send notification message
+          .storeBit(1)                                          // we store forwardPayload as a reference
+          .storeRef(forwardPayload)
+          .endCell();
+        const senderJettonWalletAddress = calcJettonWalletAddress(jettonWalletCode, jettonWalletAddress, senderAddress);
+        console.log("senderAddress", senderAddress);
+        console.log("destinationAddress", destinationAddress);
+        console.log("senderJettonWalletAddress", senderJettonWalletAddress);
+        transaction = {
+          validUntil: validUntil,
+          messages: [
+            {
+              address: senderJettonWalletAddress,       // sender jetton wallet
+              amount: ton.toNano(0.05).toString(),      // for commission fees, excess will be returned
+              payload: body.toBoc().toString("base64")  // payload with jetton transfer body
+            }
+          ]
+        }
+      }
+      try {
+        const result = await tonConnectUI.sendTransaction(transaction);
+        console.log(result)
+        await resetInset();
+      } catch (e) {
+        await resetInset();
+        console.error(e);
+      }
+    }
+
+    // https://docs.ton.org/develop/dapps/cookbook
+    function calcJettonWalletAddress(
+      jettonWalletCode,
+      jettonMasterAddressStr,
+      ownerAddressStr
+    ) {
+      const walletCode = ton.Cell.fromBoc(Buffer.from(jettonWalletCode, "hex"))[0];
+      const masterAddress = ton.Address.parse(jettonMasterAddressStr);
+      const ownerAddress = ton.Address.parse(ownerAddressStr);
+
+      const jettonWalletStateInit = ton.beginCell()
+        .store(
+          ton.storeStateInit({
+            code: walletCode,
+            data: ton.beginCell()
+              .storeCoins(0)
+              .storeAddress(ownerAddress)
+              .storeAddress(masterAddress)
+              .storeRef(walletCode)
+              .endCell(),
+          })
+        )
+        .endCell();
+      const userJettonWalletAddress = new ton.Address(0, jettonWalletStateInit.hash());
+      return userJettonWalletAddress.toString({
+        testOnly: true,
+        bounceable: true,
+      });
+    }
+
+    async function resetInset() {
+      await delay(100);
+      document.body.style.inset = "0px";
+    }
+
+    function delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+  </script>
+</body>
+
+</html>
